@@ -18,20 +18,26 @@ import {
 } from './api/recommendationEngine'
 
 function App() {
-  // Navigation state
-  const [currentView, setCurrentView] = useState('clients') // 'proposals' or 'clients' - default to clients
-  const [proposalClientId, setProposalClientId] = useState(null) // Track which client the proposal is for
+  // View mode: 'client-detail' or 'proposal'
+  const [viewMode, setViewMode] = useState('client-detail')
 
-  // Proposal view state (original)
+  // Proposal view state
   const [selectedIds, setSelectedIds] = useState([])
   const [screenMode, setScreenMode] = useState('grid') // 'grid' or 'preview'
-  const [messages, setMessages] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
   // CRM state
   const [selectedClientId, setSelectedClientId] = useState(null)
   const [clients, setClients] = useState(getAllClients())
-  const [selectedArtworkId, setSelectedArtworkId] = useState(null)
+
+  // Chat state - initialize with welcome message
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      type: 'ai',
+      text: "Hi, I'm Ceqnce! What can I help you with today?",
+    }
+  ])
 
   const toggleArtwork = (id) => {
     setSelectedIds(prev =>
@@ -97,6 +103,19 @@ function App() {
   // CRM handlers
   const handleSelectClient = (clientId) => {
     setSelectedClientId(clientId)
+    setViewMode('client-detail')
+
+    // Update chat with client context
+    const client = getClientById(clientId)
+    if (client) {
+      setMessages([
+        {
+          id: 1,
+          type: 'ai',
+          text: `Hi, I'm Ceqnce! I'm here to help with ${client.name}.\n\nWhat would you like to do?\n\n• Ask me questions about ${client.name}'s collecting history\n• Get artwork recommendations\n• Start a proposal`,
+        }
+      ])
+    }
   }
 
   const handleUpdateClientNotes = (newNote) => {
@@ -106,37 +125,49 @@ function App() {
         // Refresh clients list
         setClients(getAllClients())
 
-        // Show success message
-        alert(`Note added successfully!\n\nProfile was automatically updated based on the note content.`)
+        // Add message to chat
+        const aiMessage = {
+          id: messages.length + 1,
+          type: 'ai',
+          text: `Note added successfully! I've updated ${updatedClient.name}'s profile based on the note content.`,
+        }
+        setMessages(prev => [...prev, aiMessage])
       }
     }
   }
 
-  const handleSelectArtwork = (artworkId) => {
-    setSelectedArtworkId(artworkId)
-    // Could navigate to artwork detail view here
-    console.log('Selected artwork:', artworkId)
-  }
+  const handleStartProposal = () => {
+    if (!selectedClientId) return
 
-  const handleStartProposal = (clientId) => {
-    const client = getClientById(clientId)
+    const client = getClientById(selectedClientId)
     if (!client) return
 
-    // Set up proposal for this client
-    setProposalClientId(clientId)
+    // Clear selections and switch to proposal mode
+    setSelectedIds([])
+    setViewMode('proposal')
+
+    // Update chat for proposal context
+    const aiMessage = {
+      id: messages.length + 1,
+      type: 'ai',
+      text: `Great! I'm showing artworks for ${client.name}.\n\n${client.structuredProfile.interests.length > 0 ? `They're interested in: ${client.structuredProfile.interests.join(', ')}.` : ''}\n\nBudget: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(client.typicalPriceBand.min)} - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(client.typicalPriceBand.max)}\n\nClick artworks to add them, or ask me questions!`,
+    }
+    setMessages(prev => [...prev, aiMessage])
+  }
+
+  const handleBackToClient = () => {
+    setViewMode('client-detail')
     setSelectedIds([])
 
-    // Initialize chat with client context
-    setMessages([
-      {
-        id: 1,
+    const client = getClientById(selectedClientId)
+    if (client) {
+      const aiMessage = {
+        id: messages.length + 1,
         type: 'ai',
-        text: `Hi! I'm helping you create a proposal for ${client.name}.\n\n${client.structuredProfile.interests.length > 0 ? `They're interested in: ${client.structuredProfile.interests.join(', ')}.` : ''}\n\nBudget: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(client.typicalPriceBand.min)} - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(client.typicalPriceBand.max)}\n\nI'm showing artworks that match their profile. Click any artwork to add it to the proposal, or ask me questions about ${client.name}'s history and preferences.`,
+        text: `Back to ${client.name}'s profile. What would you like to do next?`,
       }
-    ])
-
-    // Switch to proposals view
-    setCurrentView('proposals')
+      setMessages(prev => [...prev, aiMessage])
+    }
   }
 
   // Get current client data and recommendations
@@ -147,117 +178,98 @@ function App() {
 
   return (
     <div className="h-screen bg-white flex flex-col">
-      {/* Header with Navigation */}
-      <div className="border-b border-gray-200 bg-white">
-        <div className="px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Cequence</h1>
-          <p className="text-sm text-gray-500 mt-1">AI-copilot for specialists</p>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="px-8">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setCurrentView('clients')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                currentView === 'clients'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Clients ({clients.length})
-            </button>
-            {proposalClientId && (
-              <button
-                onClick={() => setCurrentView('proposals')}
-                className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  currentView === 'proposals'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Proposal for {getClientById(proposalClientId)?.name}
-              </button>
-            )}
-          </nav>
-        </div>
+      {/* Header */}
+      <div className="border-b border-gray-200 bg-white px-8 py-4">
+        <h1 className="text-2xl font-bold text-gray-900">Ceqnce</h1>
+        <p className="text-sm text-gray-500 mt-1">AI-copilot for specialists</p>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden">
-        {/* PROPOSALS VIEW (Original) */}
-        {currentView === 'proposals' && (
-          <div className="flex h-full">
-            {/* Left: Chat Panel (40%) */}
-            <div className="w-2/5 border-r border-gray-200 flex flex-col bg-white">
-              <ChatPanel
-                messages={messages}
-                onSendMessage={handleSendMessage}
-                selectedCount={selectedIds.length}
-                isLoading={isLoading}
-              />
-            </div>
+      {/* Main Content: Chat (Left) + Content (Right) */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: Chat Panel (40%) - ALWAYS VISIBLE */}
+        <div className="w-2/5 border-r border-gray-200 flex flex-col bg-white">
+          <ChatPanel
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            selectedCount={selectedIds.length}
+            isLoading={isLoading}
+            onStartProposal={selectedClientId && viewMode === 'client-detail' ? handleStartProposal : null}
+          />
+        </div>
 
-            {/* Right: Screen Panel (60%) */}
-            <div className="w-3/5 flex flex-col bg-gray-50">
-              <ScreenPanel
-                mode={screenMode}
-                setMode={setScreenMode}
-                selectedIds={selectedIds}
-                onToggleArtwork={toggleArtwork}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* CLIENTS VIEW (New CRM) */}
-        {currentView === 'clients' && (
-          <div className="flex h-full">
-            {/* Left: Client List (30%) */}
-            <div className="w-[30%] border-r border-gray-200">
-              <ClientList
-                clients={clients}
-                onSelectClient={handleSelectClient}
-                selectedClientId={selectedClientId}
-              />
-            </div>
-
-            {/* Right: Client Detail (70%) */}
-            <div className="flex-1">
-              {currentClient ? (
-                <ClientDetail
-                  client={currentClient}
-                  recommendations={clientRecommendations}
-                  onUpdateNotes={handleUpdateClientNotes}
-                  onSelectArtwork={handleSelectArtwork}
-                  onStartProposal={handleStartProposal}
+        {/* Right: Content Area (60%) - Switches between views */}
+        <div className="w-3/5 flex flex-col bg-gray-50">
+          {viewMode === 'proposal' ? (
+            /* Proposal View with Back Button */
+            <div className="flex flex-col h-full">
+              <div className="px-6 py-3 bg-white border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Proposal for {currentClient?.name}
+                </h2>
+                <button
+                  onClick={handleBackToClient}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  ← Back to Client
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <ScreenPanel
+                  mode={screenMode}
+                  setMode={setScreenMode}
+                  selectedIds={selectedIds}
+                  onToggleArtwork={toggleArtwork}
                 />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  <div className="text-center">
-                    <svg
-                      className="mx-auto h-12 w-12 text-gray-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                      />
-                    </svg>
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No client selected</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Select a client from the list to view details
-                    </p>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            /* Client View: List + Detail */
+            <div className="flex h-full">
+              {/* Client List (35%) */}
+              <div className="w-[35%] border-r border-gray-200">
+                <ClientList
+                  clients={clients}
+                  onSelectClient={handleSelectClient}
+                  selectedClientId={selectedClientId}
+                />
+              </div>
+
+              {/* Client Detail (65%) */}
+              <div className="flex-1">
+                {currentClient ? (
+                  <ClientDetail
+                    client={currentClient}
+                    recommendations={clientRecommendations}
+                    onUpdateNotes={handleUpdateClientNotes}
+                    onSelectArtwork={() => {}}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-500">
+                    <div className="text-center">
+                      <svg
+                        className="mx-auto h-12 w-12 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                        />
+                      </svg>
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">No client selected</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Select a client from the list to view details
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

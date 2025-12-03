@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble'
 
-export default function ChatPanel({ messages, onSendMessage, selectedCount, isLoading }) {
+export default function ChatPanel({ messages, onSendMessage, selectedCount, isLoading, onStartProposal }) {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef(null)
 
@@ -34,6 +34,18 @@ export default function ChatPanel({ messages, onSendMessage, selectedCount, isLo
         ))}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Start Proposal Button (when available) */}
+      {onStartProposal && (
+        <div className="px-6 py-4 bg-blue-50 border-t border-blue-100">
+          <button
+            onClick={onStartProposal}
+            className="w-full px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Start a Proposal
+          </button>
+        </div>
+      )}
 
       {/* Selected Works Counter */}
       {selectedCount > 0 && (
