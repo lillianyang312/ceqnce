@@ -19,13 +19,15 @@ interface ClientDetailProps {
   recommendations: ArtworkRecommendation[]
   onUpdateNotes: (notes: string) => void
   onSelectArtwork: (artworkId: string) => void
+  onStartProposal: (clientId: string) => void
 }
 
 export default function ClientDetail({
   client,
   recommendations,
   onUpdateNotes,
-  onSelectArtwork
+  onSelectArtwork,
+  onStartProposal
 }: ClientDetailProps) {
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [newNote, setNewNote] = useState('')
@@ -86,9 +88,17 @@ export default function ClientDetail({
             <p className="text-sm text-gray-500 mt-1">{client.location}</p>
             <p className="text-sm text-gray-500">{client.email}</p>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-500">Lifetime Value</div>
-            <div className="text-2xl font-bold text-gray-900">{formatPrice(totalSpent)}</div>
+          <div className="text-right space-y-2">
+            <button
+              onClick={() => onStartProposal(client.id)}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Start a Proposal
+            </button>
+            <div>
+              <div className="text-xs text-gray-500">Lifetime Value</div>
+              <div className="text-xl font-bold text-gray-900">{formatPrice(totalSpent)}</div>
+            </div>
           </div>
         </div>
 

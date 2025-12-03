@@ -19,18 +19,13 @@ import {
 
 function App() {
   // Navigation state
-  const [currentView, setCurrentView] = useState('proposals') // 'proposals', 'clients', 'artworks'
+  const [currentView, setCurrentView] = useState('clients') // 'proposals' or 'clients' - default to clients
+  const [proposalClientId, setProposalClientId] = useState(null) // Track which client the proposal is for
 
   // Proposal view state (original)
   const [selectedIds, setSelectedIds] = useState([])
   const [screenMode, setScreenMode] = useState('grid') // 'grid' or 'preview'
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: 'ai',
-      text: "Hi! I'm helping you create a proposal for Jane Chen. She loves Postwar Abstraction and has a budget of $250K-$1M.\n\nI'm showing 8 works that might interest her. Click any artwork to add it, or tell me which ones you like.",
-    }
-  ])
+  const [messages, setMessages] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
   // CRM state
@@ -123,6 +118,27 @@ function App() {
     console.log('Selected artwork:', artworkId)
   }
 
+  const handleStartProposal = (clientId) => {
+    const client = getClientById(clientId)
+    if (!client) return
+
+    // Set up proposal for this client
+    setProposalClientId(clientId)
+    setSelectedIds([])
+
+    // Initialize chat with client context
+    setMessages([
+      {
+        id: 1,
+        type: 'ai',
+        text: `Hi! I'm helping you create a proposal for ${client.name}.\n\n${client.structuredProfile.interests.length > 0 ? `They're interested in: ${client.structuredProfile.interests.join(', ')}.` : ''}\n\nBudget: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(client.typicalPriceBand.min)} - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(client.typicalPriceBand.max)}\n\nI'm showing artworks that match their profile. Click any artwork to add it to the proposal, or ask me questions about ${client.name}'s history and preferences.`,
+      }
+    ])
+
+    // Switch to proposals view
+    setCurrentView('proposals')
+  }
+
   // Get current client data and recommendations
   const currentClient = selectedClientId ? getClientById(selectedClientId) : null
   const clientRecommendations = selectedClientId
@@ -134,23 +150,13 @@ function App() {
       {/* Header with Navigation */}
       <div className="border-b border-gray-200 bg-white">
         <div className="px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Ashford Contemporary CRM</h1>
-          <p className="text-sm text-gray-500 mt-1">AI-powered gallery management system</p>
+          <h1 className="text-2xl font-bold text-gray-900">Cequence</h1>
+          <p className="text-sm text-gray-500 mt-1">AI-copilot for specialists</p>
         </div>
 
         {/* Navigation Tabs */}
         <div className="px-8">
           <nav className="flex space-x-8">
-            <button
-              onClick={() => setCurrentView('proposals')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                currentView === 'proposals'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Proposal Generator
-            </button>
             <button
               onClick={() => setCurrentView('clients')}
               className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -161,16 +167,18 @@ function App() {
             >
               Clients ({clients.length})
             </button>
-            <button
-              onClick={() => setCurrentView('artworks')}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                currentView === 'artworks'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Artworks
-            </button>
+            {proposalClientId && (
+              <button
+                onClick={() => setCurrentView('proposals')}
+                className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  currentView === 'proposals'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Proposal for {getClientById(proposalClientId)?.name}
+              </button>
+            )}
           </nav>
         </div>
       </div>
@@ -222,6 +230,7 @@ function App() {
                   recommendations={clientRecommendations}
                   onUpdateNotes={handleUpdateClientNotes}
                   onSelectArtwork={handleSelectArtwork}
+                  onStartProposal={handleStartProposal}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
@@ -246,36 +255,6 @@ function App() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* ARTWORKS VIEW (Placeholder) */}
-        {currentView === 'artworks' && (
-          <div className="flex items-center justify-center h-full bg-gray-50">
-            <div className="text-center">
-              <svg
-                className="mx-auto h-16 w-16 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900">Artwork Gallery View</h3>
-              <p className="mt-2 text-sm text-gray-500 max-w-md">
-                Enhanced artwork list view with filtering, price history, and client recommendations.
-                <br />
-                <span className="text-blue-600 font-medium">Coming soon!</span>
-              </p>
-              <p className="mt-4 text-xs text-gray-400">
-                For now, you can use the Proposal Generator tab to view artworks
-              </p>
             </div>
           </div>
         )}
