@@ -4,7 +4,13 @@ import ChatPanel from './components/ChatPanel'
 import SpecialistSelector from './components/SpecialistSelector'
 import ObjectPage from './components/ObjectPage'
 import ClientPage from './components/ClientPage'
-import { autoGenerateClientNote } from './services/aiLogic'
+import {
+  autoGenerateClientNote,
+  getLikelyBuyersForObject,
+  getRelevantObjectsForClient,
+  summarizeClientBuyingHistory
+} from './services/aiLogic'
+import { objects, auctionClients } from './data/auctionMockData'
 
 function AppContent() {
   const { activeSpecialist } = useSpecialist()
@@ -32,12 +38,13 @@ function AppContent() {
     setMessages(prev => [...prev, userMessage])
     setIsLoading(true)
 
-    // Simulate AI response
+    // Generate smart AI response
     setTimeout(() => {
+      const response = generateSmartAIResponse(text)
       const aiMessage = {
         id: messages.length + 2,
         type: 'ai',
-        text: generateAIResponse(text),
+        text: response,
       }
       setMessages(prev => [...prev, aiMessage])
       setIsLoading(false)
@@ -129,27 +136,91 @@ function AppContent() {
   )
 }
 
-// Simple AI response generator (simulated)
-function generateAIResponse(userText) {
+// Smart AI response generator that searches real data
+function generateSmartAIResponse(userText) {
   const lowerText = userText.toLowerCase()
 
-  if (lowerText.includes('tell me more about') || lowerText.includes('who is')) {
-    return "I'd be happy to provide more information. Based on the data I have, this is a valuable opportunity. Would you like me to analyze their buying history or suggest relevant objects?"
+  // Search for artwork mentions
+  const foundObject = objects.find(obj =>
+    lowerText.includes(obj.title.toLowerCase()) ||
+    lowerText.includes(obj.artist.toLowerCase()) ||
+    (lowerText.includes('kusama') && obj.artist === 'Yayoi Kusama') ||
+    (lowerText.includes('infinity net') && obj.title.includes('Infinity Net'))
+  )
+
+  if (foundObject && (lowerText.includes('buyer') || lowerText.includes('follow up') || lowerText.includes('who should'))) {
+    const buyers = getLikelyBuyersForObject(foundObject.id)
+
+    if (buyers.length === 0) {
+      return `I found "${foundObject.title}" by ${foundObject.artist}, but I don't have any strong buyer matches for this work at the moment.`
+    }
+
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0
+      }).format(amount)
+    }
+
+    let response = `**Buyers for "${foundObject.title}" by ${foundObject.artist}**\n\n`
+
+    if (foundObject.isBeingSoldNow) {
+      response += `Estimate: ${formatCurrency(foundObject.estimateLow)} - ${formatCurrency(foundObject.estimateHigh)}\n`
+      response += `Sale: ${foundObject.saleName} (${foundObject.saleDate})\n\n`
+    }
+
+    response += `**Top ${Math.min(5, buyers.length)} Potential Buyers:**\n\n`
+
+    buyers.slice(0, 5).forEach((match, index) => {
+      response += `${index + 1}. **${match.client.name}** (${match.score}% match)\n`
+      response += `   Location: ${match.client.location}\n`
+      response += `   Status: ${match.client.relationshipStatus}\n`
+      response += `   Budget: ${formatCurrency(match.client.structuredProfile.typicalPriceBand.min)} - ${formatCurrency(match.client.structuredProfile.typicalPriceBand.max)}\n`
+      response += `   Why: ${match.reasons.join(', ')}\n\n`
+    })
+
+    response += `\nWould you like me to provide more details on any of these clients?`
+    return response
   }
 
+  // Search for client mentions
+  const foundClient = auctionClients.find(client =>
+    lowerText.includes(client.name.toLowerCase())
+  )
+
+  if (foundClient) {
+    const summary = summarizeClientBuyingHistory(foundClient.id)
+
+    if (summary) {
+      let response = `**${foundClient.name}**\n\n`
+      response += `Status: ${foundClient.relationshipStatus} client since ${new Date(foundClient.clientSince).getFullYear()}\n`
+      response += `Total purchases: ${summary.totalPurchases} (${new Intl.NumberFormat('en-US', { style: 'currency', currency: foundClient.currency, minimumFractionDigits: 0 }).format(summary.totalSpent)})\n\n`
+
+      if (summary.preferredArtists.length > 0) {
+        response += `**Collects:** ${summary.preferredArtists.slice(0, 3).map(a => a.artist).join(', ')}\n\n`
+      }
+
+      if (summary.patterns.length > 0) {
+        response += `**Buying Pattern:** ${summary.patterns[0]}\n\n`
+      }
+
+      response += `${summary.recentActivity}\n\n`
+      response += `Would you like to see recommended objects for this client?`
+      return response
+    }
+  }
+
+  // Generic helpful responses
   if (lowerText.includes('recommend') || lowerText.includes('suggest')) {
-    return "Based on the client's profile and collecting history, I've identified several relevant works that might interest them. Would you like me to prioritize by price range or artist?"
+    return "I can help with recommendations! Just tell me:\n• The client name (e.g., 'recommend objects for Jennifer Park')\n• Or the artwork (e.g., 'who should I contact about the Kusama piece?')"
   }
 
   if (lowerText.includes('history') || lowerText.includes('purchased') || lowerText.includes('bought')) {
-    return "Looking at their purchase history, they tend to focus on blue-chip artists with strong provenance. They're typically decisive buyers when the right work comes along."
+    return "I can analyze purchase history! Just mention a client name (e.g., 'Tell me about Marcus Chen's buying history')"
   }
 
-  if (lowerText.includes('note') || lowerText.includes('add')) {
-    return "I've noted that information in the client's profile. I'll use this to improve future recommendations and identify relevant opportunities."
-  }
-
-  return "I understand. How can I help you with this? I can provide client insights, match buyers to objects, or suggest relevant works based on collecting patterns."
+  return "I can help you:\n• Find buyers for specific artworks\n• Analyze client buying patterns\n• Recommend objects for clients\n• Identify follow-up priorities\n\nJust ask about a specific client or artwork!"
 }
 
 function App() {
