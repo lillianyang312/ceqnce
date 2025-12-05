@@ -1,51 +1,26 @@
 import { useState } from 'react'
+import { SpecialistProvider, useSpecialist } from './contexts/SpecialistContext'
 import ChatPanel from './components/ChatPanel'
-import ScreenPanel from './components/ScreenPanel'
-import ClientList from './components/ClientList'
-import ClientDetail from './components/ClientDetail'
-import { callClaudeAPI } from './utils/claude'
-import { generateProposalPDF } from './utils/exportPDF'
+import SpecialistSelector from './components/SpecialistSelector'
+import ObjectPage from './components/ObjectPage'
+import ClientPage from './components/ClientPage'
+import { autoGenerateClientNote } from './services/aiLogic'
 
-// Import CRM functions
-import {
-  getAllClients,
-  getClientById,
-  updateClientNotes
-} from './api/crmApi'
+function AppContent() {
+  const { activeSpecialist } = useSpecialist()
 
-import {
-  getLikelyArtworksForClient
-} from './api/recommendationEngine'
+  // Active tab: 'objects' or 'clients'
+  const [activeTab, setActiveTab] = useState('clients')
 
-function App() {
-  // View mode: 'client-detail' or 'proposal'
-  const [viewMode, setViewMode] = useState('client-detail')
-
-  // Proposal view state
-  const [selectedIds, setSelectedIds] = useState([])
-  const [screenMode, setScreenMode] = useState('grid') // 'grid' or 'preview'
-  const [isLoading, setIsLoading] = useState(false)
-
-  // CRM state
-  const [selectedClientId, setSelectedClientId] = useState(null)
-  const [clients, setClients] = useState(getAllClients())
-
-  // Chat state - initialize with welcome message
+  // Chat state
   const [messages, setMessages] = useState([
     {
       id: 1,
       type: 'ai',
-      text: "Hi, I'm Ceqnce! What can I help you with today?",
+      text: "Hi, I'm Ceqnce! I'm your AI copilot for specialist work. What can I help you with today?",
     }
   ])
-
-  const toggleArtwork = (id) => {
-    setSelectedIds(prev =>
-      prev.includes(id)
-        ? prev.filter(i => i !== id)
-        : [...prev, id]
-    )
-  }
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSendMessage = async (text) => {
     // Add user message
@@ -57,131 +32,43 @@ function App() {
     setMessages(prev => [...prev, userMessage])
     setIsLoading(true)
 
-    try {
-      const result = await callClaudeAPI(text, selectedIds, screenMode)
-
-      // Handle export command
-      if (result.commands.export && selectedIds.length > 0) {
-        try {
-          await generateProposalPDF(selectedIds)
-        } catch (error) {
-          console.error('Error generating PDF:', error)
-        }
-      }
-
-      // Handle artwork selections
-      for (const artworkId of result.commands.add) {
-        if (!selectedIds.includes(artworkId)) {
-          setSelectedIds(prev => [...prev, artworkId])
-        }
-      }
-
-      for (const artworkId of result.commands.remove) {
-        setSelectedIds(prev => prev.filter(id => id !== artworkId))
-      }
-
-      // Add AI message
+    // Simulate AI response
+    setTimeout(() => {
       const aiMessage = {
         id: messages.length + 2,
         type: 'ai',
-        text: result.text,
+        text: generateAIResponse(text),
       }
       setMessages(prev => [...prev, aiMessage])
-    } catch (error) {
-      console.error('Error:', error)
-      const errorMessage = {
-        id: messages.length + 2,
-        type: 'ai',
-        text: `Sorry, I encountered an error: ${error.message}. Please check that your API key is set correctly in the .env file.`,
-      }
-      setMessages(prev => [...prev, errorMessage])
-    } finally {
       setIsLoading(false)
-    }
+    }, 1000)
   }
 
-  // CRM handlers
-  const handleSelectClient = (clientId) => {
-    setSelectedClientId(clientId)
-    setViewMode('client-detail')
-
-    // Update chat with client context
-    const client = getClientById(clientId)
-    if (client) {
-      setMessages([
-        {
-          id: 1,
-          type: 'ai',
-          text: `Hi, I'm Ceqnce! I'm here to help with ${client.name}.\n\nWhat would you like to do?\n\n• Ask me questions about ${client.name}'s collecting history\n• Get artwork recommendations\n• Start a proposal`,
-        }
-      ])
-    }
+  const handleSendToChat = (message) => {
+    handleSendMessage(message)
   }
 
-  const handleUpdateClientNotes = (newNote) => {
-    if (selectedClientId) {
-      const updatedClient = updateClientNotes(selectedClientId, newNote)
-      if (updatedClient) {
-        // Refresh clients list
-        setClients(getAllClients())
-
-        // Add message to chat
-        const aiMessage = {
-          id: messages.length + 1,
-          type: 'ai',
-          text: `Note added successfully! I've updated ${updatedClient.name}'s profile based on the note content.`,
-        }
-        setMessages(prev => [...prev, aiMessage])
-      }
-    }
-  }
-
-  const handleStartProposal = () => {
-    if (!selectedClientId) return
-
-    const client = getClientById(selectedClientId)
-    if (!client) return
-
-    // Clear selections and switch to proposal mode
-    setSelectedIds([])
-    setViewMode('proposal')
-
-    // Update chat for proposal context
+  const handleAutoNoteGenerated = (clientId, note) => {
+    // Add auto-generated note to chat
     const aiMessage = {
       id: messages.length + 1,
       type: 'ai',
-      text: `Great! I'm showing artworks for ${client.name}.\n\n${client.structuredProfile.interests.length > 0 ? `They're interested in: ${client.structuredProfile.interests.join(', ')}.` : ''}\n\nBudget: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(client.typicalPriceBand.min)} - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(client.typicalPriceBand.max)}\n\nClick artworks to add them, or ask me questions!`,
+      text: note,
     }
     setMessages(prev => [...prev, aiMessage])
   }
 
-  const handleBackToClient = () => {
-    setViewMode('client-detail')
-    setSelectedIds([])
-
-    const client = getClientById(selectedClientId)
-    if (client) {
-      const aiMessage = {
-        id: messages.length + 1,
-        type: 'ai',
-        text: `Back to ${client.name}'s profile. What would you like to do next?`,
-      }
-      setMessages(prev => [...prev, aiMessage])
-    }
-  }
-
-  // Get current client data and recommendations
-  const currentClient = selectedClientId ? getClientById(selectedClientId) : null
-  const clientRecommendations = selectedClientId
-    ? getLikelyArtworksForClient(selectedClientId, 10)
-    : []
-
   return (
     <div className="h-screen bg-white flex flex-col">
-      {/* Header */}
+      {/* Main Header */}
       <div className="border-b border-gray-200 bg-white px-8 py-4">
-        <h1 className="text-2xl font-bold text-gray-900">Ceqnce</h1>
-        <p className="text-sm text-gray-500 mt-1">AI-copilot for specialists</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Ceqnce</h1>
+            <p className="text-sm text-gray-500 mt-1">AI copilot for specialists</p>
+          </div>
+          <SpecialistSelector />
+        </div>
       </div>
 
       {/* Main Content: Chat (Left) + Content (Right) */}
@@ -191,87 +78,85 @@ function App() {
           <ChatPanel
             messages={messages}
             onSendMessage={handleSendMessage}
-            selectedCount={selectedIds.length}
+            selectedCount={0}
             isLoading={isLoading}
-            onStartProposal={selectedClientId && viewMode === 'client-detail' ? handleStartProposal : null}
+            onStartProposal={null}
           />
         </div>
 
-        {/* Right: Content Area (60%) - Switches between views */}
+        {/* Right: Content Area (60%) */}
         <div className="w-3/5 flex flex-col bg-gray-50">
-          {viewMode === 'proposal' ? (
-            /* Proposal View with Back Button */
-            <div className="flex flex-col h-full">
-              <div className="px-6 py-3 bg-white border-b border-gray-200 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Proposal for {currentClient?.name}
-                </h2>
-                <button
-                  onClick={handleBackToClient}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  ← Back to Client
-                </button>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <ScreenPanel
-                  mode={screenMode}
-                  setMode={setScreenMode}
-                  selectedIds={selectedIds}
-                  onToggleArtwork={toggleArtwork}
-                />
-              </div>
+          {/* Content Header with Tabs */}
+          <div className="border-b border-gray-200 bg-white">
+            <div className="flex px-6">
+              <button
+                onClick={() => setActiveTab('objects')}
+                className={`px-4 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'objects'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Objects
+              </button>
+              <button
+                onClick={() => setActiveTab('clients')}
+                className={`px-4 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'clients'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Clients
+              </button>
             </div>
-          ) : (
-            /* Client View: List + Detail */
-            <div className="flex h-full">
-              {/* Client List (35%) */}
-              <div className="w-[35%] border-r border-gray-200">
-                <ClientList
-                  clients={clients}
-                  onSelectClient={handleSelectClient}
-                  selectedClientId={selectedClientId}
-                />
-              </div>
+          </div>
 
-              {/* Client Detail (65%) */}
-              <div className="flex-1">
-                {currentClient ? (
-                  <ClientDetail
-                    client={currentClient}
-                    recommendations={clientRecommendations}
-                    onUpdateNotes={handleUpdateClientNotes}
-                    onSelectArtwork={() => {}}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <div className="text-center">
-                      <svg
-                        className="mx-auto h-12 w-12 text-gray-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                        />
-                      </svg>
-                      <h3 className="mt-2 text-sm font-medium text-gray-900">No client selected</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Select a client from the list to view details
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Content */}
+          <div className="flex-1 overflow-hidden">
+            {activeTab === 'objects' ? (
+              <ObjectPage onSendToChat={handleSendToChat} />
+            ) : (
+              <ClientPage
+                onSendToChat={handleSendToChat}
+                onAutoNoteGenerated={handleAutoNoteGenerated}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
+  )
+}
+
+// Simple AI response generator (simulated)
+function generateAIResponse(userText) {
+  const lowerText = userText.toLowerCase()
+
+  if (lowerText.includes('tell me more about') || lowerText.includes('who is')) {
+    return "I'd be happy to provide more information. Based on the data I have, this is a valuable opportunity. Would you like me to analyze their buying history or suggest relevant objects?"
+  }
+
+  if (lowerText.includes('recommend') || lowerText.includes('suggest')) {
+    return "Based on the client's profile and collecting history, I've identified several relevant works that might interest them. Would you like me to prioritize by price range or artist?"
+  }
+
+  if (lowerText.includes('history') || lowerText.includes('purchased') || lowerText.includes('bought')) {
+    return "Looking at their purchase history, they tend to focus on blue-chip artists with strong provenance. They're typically decisive buyers when the right work comes along."
+  }
+
+  if (lowerText.includes('note') || lowerText.includes('add')) {
+    return "I've noted that information in the client's profile. I'll use this to improve future recommendations and identify relevant opportunities."
+  }
+
+  return "I understand. How can I help you with this? I can provide client insights, match buyers to objects, or suggest relevant works based on collecting patterns."
+}
+
+function App() {
+  return (
+    <SpecialistProvider>
+      <AppContent />
+    </SpecialistProvider>
   )
 }
 
