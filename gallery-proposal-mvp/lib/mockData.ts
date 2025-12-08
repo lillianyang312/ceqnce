@@ -1,7 +1,6 @@
 // Mock in-memory data for running without database
-import bcrypt from 'bcrypt'
-
-const passwordHash = bcrypt.hashSync('password123', 10)
+// Pre-computed bcrypt hash for 'password123' (to avoid runtime hashing in edge contexts)
+const passwordHash = '$2b$10$rZzXBjQE9cb7deZG.3nrvuM7E8CmUtF642K.NGn6WJvZZOeB9tir6'
 
 export const mockGallery = {
   id: 'gal_ceqnce',
