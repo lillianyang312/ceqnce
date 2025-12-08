@@ -8,12 +8,12 @@ async function main() {
 
   // Create Gallery
   const gallery = await prisma.gallery.upsert({
-    where: { id: 'gal_aurora' },
+    where: { id: 'gal_ceqnce' },
     update: {},
     create: {
-      id: 'gal_aurora',
-      name: 'Aurora Contemporary',
-      contactEmail: 'info@auroracontemporary.com',
+      id: 'gal_ceqnce',
+      name: 'Ceqnce Contemporary',
+      contactEmail: 'info@ceqnce.com',
     },
   })
   console.log('✅ Created gallery:', gallery.name)
@@ -22,26 +22,26 @@ async function main() {
   const passwordHash = await bcrypt.hash('password123', 10)
 
   const jane = await prisma.user.upsert({
-    where: { email: 'jane@auroracontemporary.com' },
+    where: { email: 'jane@ceqnce.com' },
     update: {},
     create: {
       id: 'user_jane',
       galleryId: gallery.id,
       name: 'Jane Alvarez',
-      email: 'jane@auroracontemporary.com',
+      email: 'jane@ceqnce.com',
       role: 'GALLERY_ADMIN',
       passwordHash,
     },
   })
 
   const marc = await prisma.user.upsert({
-    where: { email: 'marc@auroracontemporary.com' },
+    where: { email: 'marc@ceqnce.com' },
     update: {},
     create: {
       id: 'user_marc',
       galleryId: gallery.id,
       name: 'Marc Liu',
-      email: 'marc@auroracontemporary.com',
+      email: 'marc@ceqnce.com',
       role: 'SPECIALIST',
       passwordHash,
     },
