@@ -1,125 +1,210 @@
-# Gallery Proposal Generator MVP
+# Gallery CRM - Deal Flow Management System
 
-A conversational AI-powered web app that helps gallery staff create professional artwork proposals through natural chat, with real-time preview and PDF export.
+A complete internal CRM and deal-flow tool built with Next.js, TypeScript, Prisma, and Anthropic's Claude AI.
 
 ## Features
 
-- **Conversational Interface**: Chat with Claude AI to select artworks
-- **Real-time Preview**: See your proposal build live as you add artworks
-- **Professional PDF Export**: Generate polished, client-ready proposal PDFs
-- **Responsive Design**: Modern, clean UI with light theme
-- **No Database Required**: Session-based (no login needed)
+- **Deal Flow Management**: Track OBJECT_SALE, CLIENT_REQUEST, and CONSIGNMENT workflows
+- **Objects (Inventory)**: Manage gallery artworks with pricing, status, and metadata
+- **Clients**: Buyer and consigner profiles with interests, budgets, and engagement tracking
+- **AI Assistant**: Intelligent chatbot with tool calling to:
+  - Match buyers to artworks
+  - Search internal and external inventory
+  - Create and update deal flows
+  - Add structured notes
+- **Authentication**: Secure login for gallery admins and specialists
+- **Session Management**: Iron-session based auth with role-based access
 
 ## Tech Stack
 
-- **Frontend**: React 18 + Tailwind CSS + Vite
-- **PDF Generation**: jsPDF
-- **AI**: Anthropic Claude API
-- **Styling**: Tailwind CSS with custom theme
+- **Frontend**: Next.js 14 (App Router), React 18, TypeScript
+- **Backend**: Next.js API routes, Prisma ORM
+- **Database**: PostgreSQL
+- **AI**: Anthropic Claude (claude-3-5-sonnet)
+- **Auth**: iron-session, bcrypt
+- **Styling**: Tailwind CSS
 
-## Setup
+## Setup Instructions
 
-### 1. Clone the repository
+### 1. Prerequisites
+
+- Node.js 20+
+- PostgreSQL database
+- Anthropic API key (get from https://console.anthropic.com/)
+
+### 2. Clone and Install
+
 ```bash
-git clone https://github.com/yourusername/gallery-proposal-mvp.git
 cd gallery-proposal-mvp
-```
-
-### 2. Install dependencies
-```bash
 npm install
 ```
 
-### 3. Set up environment variables
-```bash
-# Copy the example file
-cp .env.example .env
+### 3. Environment Setup
 
-# Edit .env and add your Anthropic API key
-# Get your key at: https://console.anthropic.com/
-VITE_ANTHROPIC_API_KEY=your_api_key_here
+Create a `.env` file:
+
+```bash
+cp .env.example .env
 ```
 
-### 4. Add artwork images (optional)
-Place artwork images in `public/images/` with these names:
-- `01-frankenthaler.jpg`
-- `02-kiefer.jpg`
-- `03-rothko.jpg`
-- `04-mitchell.jpg`
-- `05-twombly.jpg`
-- `06-motherwell.jpg`
-- `07-martin.jpg`
-- `08-kelly.jpg`
+Edit `.env` with your values:
 
-If no images are provided, PDFs will show placeholders.
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/gallery_crm"
+SESSION_SECRET="your-secret-key-here"  # Generate with: openssl rand -base64 32
+ANTHROPIC_API_KEY="sk-ant-api03-..."
+```
 
-### 5. Run development server
+### 4. Database Setup
+
+```bash
+# Push schema to database
+npm run db:push
+
+# Seed with demo data
+npm run db:seed
+```
+
+### 5. Run Development Server
+
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [http://localhost:3000](http://localhost:3000)
+
+## Demo Accounts
+
+**Gallery Admin:**
+- Email: `jane@auroracontemporary.com`
+- Password: `password123`
+
+**Specialist:**
+- Email: `marc@auroracontemporary.com`
+- Password: `password123`
 
 ## Usage
 
-1. **Select Artworks**: Click on artwork cards to add them to your proposal
-2. **View Total**: See the running total value of selected works
-3. **Export PDF**: Click "Export PDF" to download a professional proposal document
+### Deal Flow (Homepage)
+
+The default page shows all active deal flows:
+- **OBJECT_SALE**: Selling artworks to buyers
+- **CLIENT_REQUEST**: Finding works for client requests
+- **CONSIGNMENT**: Managing secondary market consignments
+
+Ask the AI assistant: *"Who should we show Blue Composition to?"*
+
+### Objects Page
+
+Browse gallery inventory. The AI can:
+- Search by artist, price, status
+- Match objects to client requests
+- Suggest buyers based on collecting patterns
+
+### Clients Page
+
+Manage buyer and consigner relationships. The AI can:
+- Search clients by interests and budget
+- Track digital engagement
+- Manage notes and consignment info
+
+### AI Assistant Features
+
+The chat uses Claude with function calling to:
+
+**Find Buyers:**
+```
+"Who are the best clients for the Lea Richter piece?"
+```
+
+**Match Inventory:**
+```
+"Marcus wants Latin American urban art under $120k. What do we have?"
+```
+
+**Create Deal Flows:**
+```
+"Create an OBJECT_SALE for Blue Composition targeting Robin Patel"
+```
+
+**Search External:**
+```
+"Find Rafael Ortega works at other galleries"
+```
 
 ## Project Structure
 
 ```
 gallery-proposal-mvp/
-├── src/
-│   ├── App.jsx              # Main app component
-│   ├── main.jsx             # Entry point
-│   ├── index.css            # Global styles
-│   ├── components/          # React components (coming soon)
-│   ├── data/
-│   │   └── mockData.js      # Artwork, client, gallery data
-│   └── utils/
-│       ├── exportPDF.js     # PDF generation logic
-│       └── formatters.js    # Utility functions
-├── public/
-│   └── images/              # Artwork images
-├── .env.example             # Environment variables template
-├── index.html
-├── package.json
-├── tailwind.config.js
-├── vite.config.js
-└── README.md
+├── app/
+│   ├── (protected)/          # Auth-protected routes
+│   │   ├── layout.tsx         # Protected layout with chat + nav
+│   │   ├── page.tsx           # Deal Flow homepage
+│   │   ├── objects/page.tsx   # Objects inventory
+│   │   └── clients/page.tsx   # Clients management
+│   ├── api/
+│   │   ├── auth/              # Login/logout endpoints
+│   │   └── chat/route.ts      # AI chat with tool calling
+│   ├── login/page.tsx         # Login page
+│   ├── layout.tsx             # Root layout
+│   └── globals.css            # Global styles
+├── components/
+│   ├── Chat.tsx               # AI chat component
+│   └── LogoutButton.tsx
+├── lib/
+│   ├── auth.ts                # Session management
+│   ├── db.ts                  # Prisma client
+│   ├── tools.ts               # AI tool functions
+│   └── llm/systemPrompt.ts    # Claude system prompt
+├── prisma/
+│   ├── schema.prisma          # Database schema
+│   └── seed.ts                # Demo data seed
+└── middleware.ts              # Route protection
 ```
 
-## Environment Variables
+## System Prompt
 
-Create a `.env` file (not included in git) with:
+The AI assistant uses a comprehensive system prompt defined in `lib/llm/systemPrompt.ts`. It includes:
+- Gallery CRM domain knowledge
+- Tool calling instructions
+- Deal flow workflow guidance
+- Type-specific behaviors (OBJECT_SALE, CLIENT_REQUEST, CONSIGNMENT)
 
-```
-VITE_ANTHROPIC_API_KEY=your_api_key_here
-```
-
-**Never commit your `.env` file** - it contains your API key.
-
-## Building for Production
+## Available Scripts
 
 ```bash
-npm run build
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run start        # Start production server
+npm run db:push      # Push Prisma schema to database
+npm run db:seed      # Seed database with demo data
+npm run db:studio    # Open Prisma Studio (database GUI)
 ```
 
-This creates an optimized build in the `dist/` folder.
+## Demo Data
 
-## Roadmap
+The seed script creates:
+- **Gallery**: Aurora Contemporary
+- **Users**: Jane (admin), Marc (specialist)
+- **Objects**: 4 artworks (Richter, Ortega, Nakamoto, Jensen)
+- **Clients**: 4 clients (Robin, Sophia, Marcus, Anna)
+- **Deal Flows**: 3 active deals
+- **External Inventory**: 2 external items
+- **Client Notes**: Sample notes with tags
 
-- [ ] Add chat interface with Claude API
-- [ ] Build proposal preview component
-- [ ] Add more customization options
-- [ ] Multi-client support
-- [ ] Dashboard for saved proposals
+## Next Steps
+
+1. **Add Detail Views**: Click-through to object/client/deal flow details
+2. **Create Forms**: UI to add new objects, clients, deal flows
+3. **Image Upload**: Handle actual image uploads for objects and notes
+4. **Email Integration**: Send proposals and follow-ups
+5. **Reports**: Analytics on deals won/lost, client activity
+6. **Mobile**: Responsive design improvements
 
 ## License
 
-MIT
+Private - Internal use only
 
-## Contact
+## Support
 
-For questions or feedback, open an issue on GitHub.
+For issues or questions, contact the development team.

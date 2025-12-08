@@ -1,0 +1,152 @@
+// Prisma schema for Gallery CRM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Gallery {
+  id           String     @id @default(cuid())
+  name         String
+  contactEmail String?
+  users        User[]
+  objects      Object[]
+  clients      Client[]
+  dealFlows    DealFlow[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model User {
+  id           String       @id @default(cuid())
+  galleryId    String
+  gallery      Gallery      @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  name         String
+  email        String       @unique
+  role         String       // 'GALLERY_ADMIN' | 'SPECIALIST'
+  passwordHash String
+  notes        ClientNote[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([galleryId])
+}
+
+model Object {
+  id           String     @id @default(cuid())
+  galleryId    String
+  gallery      Gallery    @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  title        String
+  artist       String
+  year         Int?
+  medium       String
+  dimensions   String?
+  location     String?
+  price        Int?       // price in cents or smallest currency unit
+  status       String     // 'AVAILABLE' | 'ON_HOLD' | 'SOLD' | 'CONSIGNED'
+  imageUrl     String?
+  metadataJson Json?
+  dealFlows    DealFlow[]
+  clientNotes  ClientNote[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([galleryId])
+  @@index([artist])
+  @@index([status])
+}
+
+model Client {
+  id                        String          @id @default(cuid())
+  galleryId                 String
+  gallery                   Gallery         @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  name                      String
+  email                     String?
+  phone                     String?
+  typeTags                  String          // 'BUYER' | 'CONSIGNER' | 'BUYER,CONSIGNER'
+  knownInterests            String?
+  digitalEngagementJson     Json?
+  pastBuyingEngagementJson  Json?
+  notes                     ClientNote[]
+  consignerInfo             ConsignerInfo?
+  dealFlows                 DealFlow[]
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+
+  @@index([galleryId])
+  @@index([typeTags])
+}
+
+model ClientNote {
+  id               String   @id @default(cuid())
+  clientId         String
+  client           Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  specialistId     String
+  specialist       User     @relation(fields: [specialistId], references: [id], onDelete: Cascade)
+  type             String   // 'TEXT' | 'IMAGE'
+  text             String?  @db.Text
+  imageUrl         String?
+  tags             String?
+  linkedObjectId   String?
+  linkedObject     Object?  @relation(fields: [linkedObjectId], references: [id], onDelete: SetNull)
+  linkedDealFlowId String?
+  linkedDealFlow   DealFlow? @relation(fields: [linkedDealFlowId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([specialistId])
+}
+
+model ConsignerInfo {
+  id                    String  @id @default(cuid())
+  clientId              String  @unique
+  client                Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  knownOwnedObjectsJson Json?
+  notes                 String? @db.Text
+}
+
+model DealFlow {
+  id                       String       @id @default(cuid())
+  galleryId                String
+  gallery                  Gallery      @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  type                     String       // 'OBJECT_SALE' | 'CLIENT_REQUEST' | 'CONSIGNMENT'
+  status                   String       // 'NEW' | 'QUALIFYING' | 'IN_PROGRESS' | etc.
+  title                    String
+  description              String?      @db.Text
+  objectId                 String?
+  object                   Object?      @relation(fields: [objectId], references: [id], onDelete: SetNull)
+  clientId                 String?
+  client                   Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  externalCounterpartyName String?
+  metadataJson             Json?
+  clientNotes              ClientNote[]
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  @@index([galleryId])
+  @@index([type])
+  @@index([status])
+}
+
+model ExternalInventoryItem {
+  id           String  @id @default(cuid())
+  sourceType   String  // 'GALLERY' | 'AUCTION_HOUSE'
+  sourceName   String
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  objectTitle  String
+  artist       String
+  year         Int?
+  medium       String
+  priceInfo    String?
+  metadataJson Json?
+
+  @@index([artist])
+  @@index([sourceType])
+}
