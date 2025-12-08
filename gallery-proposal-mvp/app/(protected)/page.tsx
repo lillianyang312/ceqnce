@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db'
+import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
@@ -6,14 +6,15 @@ export default async function DealFlowPage() {
   const user = await requireAuth()
   if (!user) redirect('/login')
 
-  const dealFlows = await prisma.dealFlow.findMany({
-    where: { galleryId: user.galleryId },
-    include: {
-      client: true,
-      object: true,
-    },
-    orderBy: { updatedAt: 'desc' },
-  })
+  // Get deal flows with related data from mock database
+  const dealFlows = db.dealFlows
+    .filter((flow) => flow.galleryId === user.galleryId)
+    .map((flow) => ({
+      ...flow,
+      client: db.clients.find((c) => c.id === flow.clientId) || null,
+      object: db.objects.find((o) => o.id === flow.objectId) || null,
+    }))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 
   return (
     <div className="p-8">

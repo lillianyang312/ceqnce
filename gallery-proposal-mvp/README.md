@@ -29,8 +29,8 @@ A complete internal CRM and deal-flow tool built with Next.js, TypeScript, Prism
 ### 1. Prerequisites
 
 - Node.js 20+
-- PostgreSQL database
-- Anthropic API key (get from https://console.anthropic.com/)
+- ~~PostgreSQL database~~ **NOT NEEDED - App runs with mock data!**
+- Anthropic API key (OPTIONAL - only needed for AI chat features)
 
 ### 2. Clone and Install
 
@@ -50,22 +50,16 @@ cp .env.example .env
 Edit `.env` with your values:
 
 ```env
-DATABASE_URL="postgresql://user:password@localhost:5432/gallery_crm"
-SESSION_SECRET="your-secret-key-here"  # Generate with: openssl rand -base64 32
-ANTHROPIC_API_KEY="sk-ant-api03-..."
+# Session secret (generate with: openssl rand -base64 32)
+SESSION_SECRET="your-secret-key-here"
+
+# OPTIONAL - Only needed if you want AI chat to work
+# ANTHROPIC_API_KEY="sk-ant-api03-..."
 ```
 
-### 4. Database Setup
+**Note**: The app now runs with in-memory mock data, so **no database setup is required!** The AI chat feature will be disabled without an Anthropic API key, but all other features work.
 
-```bash
-# Push schema to database
-npm run db:push
-
-# Seed with demo data
-npm run db:seed
-```
-
-### 5. Run Development Server
+### 4. Run Development Server
 
 ```bash
 npm run dev
@@ -76,11 +70,11 @@ Open [http://localhost:3000](http://localhost:3000)
 ## Demo Accounts
 
 **Gallery Admin:**
-- Email: `jane@auroracontemporary.com`
+- Email: `jane@ceqnce.com`
 - Password: `password123`
 
 **Specialist:**
-- Email: `marc@auroracontemporary.com`
+- Email: `marc@ceqnce.com`
 - Password: `password123`
 
 ## Usage
@@ -176,21 +170,21 @@ The AI assistant uses a comprehensive system prompt defined in `lib/llm/systemPr
 npm run dev          # Start development server
 npm run build        # Build for production
 npm run start        # Start production server
-npm run db:push      # Push Prisma schema to database
-npm run db:seed      # Seed database with demo data
-npm run db:studio    # Open Prisma Studio (database GUI)
+# Database commands not needed - app uses mock data
 ```
 
 ## Demo Data
 
-The seed script creates:
-- **Gallery**: Aurora Contemporary
+The app includes mock data (no database required!):
+- **Gallery**: Ceqnce Contemporary
 - **Users**: Jane (admin), Marc (specialist)
 - **Objects**: 4 artworks (Richter, Ortega, Nakamoto, Jensen)
 - **Clients**: 4 clients (Robin, Sophia, Marcus, Anna)
 - **Deal Flows**: 3 active deals
 - **External Inventory**: 2 external items
 - **Client Notes**: Sample notes with tags
+
+All data is stored in-memory in `lib/mockData.ts` and resets when you restart the server.
 
 ## Next Steps
 

@@ -1,7 +1,7 @@
 import { getIronSession, IronSession, SessionOptions } from 'iron-session'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcrypt'
-import { prisma } from './db'
+import { db } from './db'
 
 export interface SessionData {
   userId: string
@@ -28,10 +28,8 @@ export async function getSession(): Promise<IronSession<SessionData>> {
 }
 
 export async function login(email: string, password: string) {
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { gallery: true },
-  })
+  // Find user in mock data
+  const user = db.users.find((u) => u.email === email)
 
   if (!user) {
     return { success: false, error: 'Invalid email or password' }

@@ -1,4 +1,4 @@
-import { prisma } from './db'
+import { db } from './db'
 
 export async function searchClients(criteria: {
   galleryId: string
@@ -8,31 +8,35 @@ export async function searchClients(criteria: {
   budgetMax?: number
   typeTags?: string
 }) {
-  const where: any = { galleryId: criteria.galleryId }
+  let results = db.clients.filter((c) => c.galleryId === criteria.galleryId)
 
   if (criteria.typeTags) {
-    where.typeTags = { contains: criteria.typeTags }
+    results = results.filter((c) => c.typeTags.includes(criteria.typeTags!))
   }
 
-  if (criteria.interests || criteria.artist) {
-    where.OR = []
-    if (criteria.interests) {
-      where.OR.push({ knownInterests: { contains: criteria.interests, mode: 'insensitive' } })
-    }
-    if (criteria.artist) {
-      where.OR.push({ knownInterests: { contains: criteria.artist, mode: 'insensitive' } })
-    }
+  if (criteria.interests) {
+    results = results.filter((c) =>
+      c.knownInterests.toLowerCase().includes(criteria.interests!.toLowerCase())
+    )
   }
 
-  const clients = await prisma.client.findMany({
-    where,
-    include: {
-      _count: { select: { dealFlows: true, notes: true } },
-    },
-    take: 10,
-  })
+  if (criteria.artist) {
+    results = results.filter((c) =>
+      c.knownInterests.toLowerCase().includes(criteria.artist!.toLowerCase())
+    )
+  }
 
-  return clients
+  if (criteria.budgetMin || criteria.budgetMax) {
+    results = results.filter((c) => {
+      const budget = (c.pastBuyingEngagementJson as any)?.budgetRange
+      if (!budget) return false
+      if (criteria.budgetMin && budget.max < criteria.budgetMin) return false
+      if (criteria.budgetMax && budget.min > criteria.budgetMax) return false
+      return true
+    })
+  }
+
+  return results.slice(0, 10)
 }
 
 export async function searchObjects(criteria: {
@@ -43,54 +47,54 @@ export async function searchObjects(criteria: {
   priceMax?: number
   status?: string
 }) {
-  const where: any = { galleryId: criteria.galleryId }
+  let results = db.objects.filter((o) => o.galleryId === criteria.galleryId)
 
   if (criteria.artist) {
-    where.artist = { contains: criteria.artist, mode: 'insensitive' }
+    results = results.filter((o) =>
+      o.artist.toLowerCase().includes(criteria.artist!.toLowerCase())
+    )
   }
 
   if (criteria.title) {
-    where.title = { contains: criteria.title, mode: 'insensitive' }
+    results = results.filter((o) =>
+      o.title.toLowerCase().includes(criteria.title!.toLowerCase())
+    )
   }
 
-  if (criteria.priceMin || criteria.priceMax) {
-    where.price = {}
-    if (criteria.priceMin) where.price.gte = criteria.priceMin * 100
-    if (criteria.priceMax) where.price.lte = criteria.priceMax * 100
+  if (criteria.priceMin) {
+    results = results.filter((o) => o.price >= criteria.priceMin! * 100)
+  }
+
+  if (criteria.priceMax) {
+    results = results.filter((o) => o.price <= criteria.priceMax! * 100)
   }
 
   if (criteria.status) {
-    where.status = criteria.status
+    results = results.filter((o) => o.status === criteria.status)
   }
 
-  const objects = await prisma.object.findMany({
-    where,
-    take: 10,
-  })
-
-  return objects
+  return results.slice(0, 10)
 }
 
 export async function searchExternalInventory(criteria: {
   artist?: string
   objectTitle?: string
 }) {
-  const where: any = {}
+  let results = [...db.externalInventory]
 
   if (criteria.artist) {
-    where.artist = { contains: criteria.artist, mode: 'insensitive' }
+    results = results.filter((i) =>
+      i.artist.toLowerCase().includes(criteria.artist!.toLowerCase())
+    )
   }
 
   if (criteria.objectTitle) {
-    where.objectTitle = { contains: criteria.objectTitle, mode: 'insensitive' }
+    results = results.filter((i) =>
+      i.objectTitle.toLowerCase().includes(criteria.objectTitle!.toLowerCase())
+    )
   }
 
-  const items = await prisma.externalInventoryItem.findMany({
-    where,
-    take: 10,
-  })
-
-  return items
+  return results.slice(0, 10)
 }
 
 export async function createOrUpdateDealFlow(payload: {
@@ -104,36 +108,48 @@ export async function createOrUpdateDealFlow(payload: {
   status?: string
 }) {
   if (payload.id) {
-    return await prisma.dealFlow.update({
-      where: { id: payload.id },
-      data: {
+    // Update existing deal flow
+    const index = db.dealFlows.findIndex((d) => d.id === payload.id)
+    if (index !== -1) {
+      db.dealFlows[index] = {
+        ...db.dealFlows[index],
         title: payload.title,
-        description: payload.description,
-        clientId: payload.clientId,
-        objectId: payload.objectId,
-        status: payload.status,
-      },
-    })
+        description: payload.description || db.dealFlows[index].description,
+        clientId: payload.clientId || db.dealFlows[index].clientId,
+        objectId: payload.objectId || db.dealFlows[index].objectId,
+        status: payload.status || db.dealFlows[index].status,
+        updatedAt: new Date(),
+      }
+      return db.dealFlows[index]
+    }
   } else {
-    return await prisma.dealFlow.create({
-      data: {
-        galleryId: payload.galleryId,
-        type: payload.type,
-        title: payload.title,
-        description: payload.description,
-        clientId: payload.clientId,
-        objectId: payload.objectId,
-        status: payload.status || 'NEW',
-      },
-    })
+    // Create new deal flow
+    const newDealFlow = {
+      id: `deal_${Date.now()}`,
+      galleryId: payload.galleryId,
+      type: payload.type,
+      title: payload.title,
+      description: payload.description || '',
+      clientId: payload.clientId || null,
+      objectId: payload.objectId || null,
+      status: payload.status || 'NEW',
+      metadataJson: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    db.dealFlows.push(newDealFlow)
+    return newDealFlow
   }
 }
 
 export async function updateDealFlowStage(dealFlowId: string, status: string) {
-  return await prisma.dealFlow.update({
-    where: { id: dealFlowId },
-    data: { status },
-  })
+  const index = db.dealFlows.findIndex((d) => d.id === dealFlowId)
+  if (index !== -1) {
+    db.dealFlows[index].status = status
+    db.dealFlows[index].updatedAt = new Date()
+    return db.dealFlows[index]
+  }
+  return null
 }
 
 export async function createClientNote(
@@ -144,15 +160,17 @@ export async function createClientNote(
   linkedObjectId?: string,
   linkedDealFlowId?: string
 ) {
-  return await prisma.clientNote.create({
-    data: {
-      clientId,
-      specialistId,
-      type: 'TEXT',
-      text: noteText,
-      tags,
-      linkedObjectId,
-      linkedDealFlowId,
-    },
-  })
+  const newNote = {
+    id: `note_${Date.now()}`,
+    clientId,
+    specialistId,
+    type: 'TEXT' as const,
+    text: noteText,
+    tags: tags || null,
+    linkedObjectId: linkedObjectId || null,
+    linkedDealFlowId: linkedDealFlowId || null,
+    createdAt: new Date(),
+  }
+  db.clientNotes.push(newNote)
+  return newNote
 }

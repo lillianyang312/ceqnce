@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db'
+import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
@@ -6,10 +6,8 @@ export default async function ObjectsPage() {
   const user = await requireAuth()
   if (!user) redirect('/login')
 
-  const objects = await prisma.object.findMany({
-    where: { galleryId: user.galleryId },
-    orderBy: { updatedAt: 'desc' },
-  })
+  // Get objects from mock database
+  const objects = db.objects.filter((obj) => obj.galleryId === user.galleryId)
 
   return (
     <div className="p-8">

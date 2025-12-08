@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db'
+import { db } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
@@ -6,15 +6,16 @@ export default async function ClientsPage() {
   const user = await requireAuth()
   if (!user) redirect('/login')
 
-  const clients = await prisma.client.findMany({
-    where: { galleryId: user.galleryId },
-    include: {
+  // Get clients from mock database with counts
+  const clients = db.clients
+    .filter((client) => client.galleryId === user.galleryId)
+    .map((client) => ({
+      ...client,
       _count: {
-        select: { notes: true, dealFlows: true },
+        notes: db.clientNotes.filter((note) => note.clientId === client.id).length,
+        dealFlows: db.dealFlows.filter((flow) => flow.clientId === client.id).length,
       },
-    },
-    orderBy: { updatedAt: 'desc' },
-  })
+    }))
 
   return (
     <div className="p-8">
