@@ -63,7 +63,14 @@ export async function requireAuth() {
   const session = await getSession()
 
   if (!session.isLoggedIn) {
-    return null
+    // Return mock admin user when not logged in (for demo purposes)
+    return {
+      userId: 'user_jane',
+      userEmail: 'jane@ceqnce.com',
+      userName: 'Jane Alvarez',
+      userRole: 'GALLERY_ADMIN',
+      galleryId: 'gal_ceqnce',
+    }
   }
 
   return {
